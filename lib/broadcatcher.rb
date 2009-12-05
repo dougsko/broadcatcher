@@ -7,23 +7,22 @@
 require 'yaml'
 require 'rss'
 require 'open-uri'
-require 'digest/md5'
 require 'logger'
 require 'lib/item_handler'
 
 class Broadcatcher
     def initialize
-        @config_file = "/home/doug/.broadcatcher/config.yml"
+        @config_file = "#{ENV['HOME']}/.broadcatcher/config.yml"
     end
 
-    def create_config
-        File.open(@config_file, 'w') do |f|
-            config = { :working_dir => "/home/doug/.broadcatcher/",
-                       :db_file => "/home/doug/.broadcatcher/downloaded.sqlite",
-                       :log => "/home/doug/.broadcatcher/log.txt",
+    def create_config(output=@config_file)
+        File.open(output, 'w') do |f|
+            config = { :working_dir => "#{ENV['HOME']}/.broadcatcher/",
+                       :db_file => "#{ENV['HOME']}/.broadcatcher/downloaded.sqlite",
+                       :log => "#{ENV['HOME']}/.broadcatcher/log.txt",
                        :feeds => [{'name' => 'example feed',
                                    'url' => 'http://foo',
-                                   'save_dir' => '/home/doug/torrents',
+                                   'save_dir' => "#{ENV['HOME']}/torrents",
                                    'regex_false' => 'mkv',
                                    'regex_true' => '.*',
                                    'scan_time' => '60',
@@ -36,11 +35,23 @@ class Broadcatcher
         end
     end
 
-    def read_config
-        File.open(@config_file, 'r') do |f|
+    def read_config(input=@config_file)
+        File.open(input, 'r') do |f|
             @config = YAML.load(f)
         end
         @log = Logger.new(@config[:log])
+        @config
+    end
+
+    def parse_feed(feed)
+        @log.debug "Getting #{feed['name']}"
+        rss_feed = feed["url"]
+        rss_content = ""
+        open(rss_feed) do |f|
+            rss_content = f.read
+        end
+        @log.debug "Parsing #{feed['name']}"
+        RSS::Parser.parse(rss_content, false)
     end
 
     def run
@@ -49,19 +60,10 @@ class Broadcatcher
         @config[:feeds].each do |feed|
             threads << Thread.new do
                 #while true do
-                    @log.debug "Getting #{feed['name']}"
-                    rss_feed = feed["url"]
-                    rss_content = ""
-                    open(rss_feed) do |f|
-                        rss_content = f.read
-                    end
-                    @log.debug "Parsing #{feed['name']}"
-                    rss = RSS::Parser.parse(rss_content, false)
+                    rss = parse_feed(feed)
                     rss.channel.items.each do |item|
-
-                        ih = ItemHandler.new(feed, item)
-                        
-                        if ih.regex_true? and ih.regex_false? and ih.size_ok? and not ih.downloaded?
+                        ih = ItemHandler.new(feed, item, @log)
+                        if ih.regex_true? and not ih.regex_false? and ih.size_ok? and not ih.downloaded?
                             ih.download
                         end
                     end
@@ -77,5 +79,5 @@ class Broadcatcher
     end
 end
 
-bc = Broadcatcher.new
-bc.run
+#bc = Broadcatcher.new
+#bc.run
