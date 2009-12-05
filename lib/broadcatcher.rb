@@ -43,33 +43,20 @@ class Broadcatcher
         @config
     end
 
-    def parse_feed(feed)
-        @log.debug "Getting #{feed['name']}"
-        rss_feed = feed["url"]
-        rss_content = ""
-        open(rss_feed) do |f|
-            rss_content = f.read
-        end
-        @log.debug "Parsing #{feed['name']}"
-        RSS::Parser.parse(rss_content, false)
-    end
-
     def run
         read_config
         threads = []
         @config[:feeds].each do |feed|
             threads << Thread.new do
-                #while true do
-                    rss = parse_feed(feed)
-                    rss.channel.items.each do |item|
-                        ih = ItemHandler.new(feed, item, @log)
+                while true do
+                    ih = ItemHandler.new(feed, @log)
+                    ih.parse_feed do |item|
                         if ih.regex_true? and not ih.regex_false? and ih.size_ok? and not ih.downloaded?
                             ih.download
                         end
                     end
-
-                    #sleep feed["scan_time"]
-                #end
+                    sleep feed["scan_time"]
+                end
             end
         end
         threads.each do |thread|

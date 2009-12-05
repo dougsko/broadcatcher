@@ -20,21 +20,4 @@ describe "Broadcatcher" do
       config[:feeds][0]['name'].should match(/example feed/)
   end
 
-  it "parses feed" do
-      @bc.read_config
-      feed = { "name" => "rss_specs",
-               "regex_false" => "use",
-               "save_dir" => "/tmp",
-               "url" => "http://www.rss-specifications.com/rss-podcast.xml",
-               "regex_true" => ".*",
-               "scan_time" => "60",
-               "min_size" => "0",
-               "max_size" => "2048",
-      }
-      rss = @bc.parse_feed(feed)
-      rss.channel.title.should match(/RSS Feed Podcast/)
-  end
-
-
-
 end

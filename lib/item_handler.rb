@@ -8,28 +8,42 @@ require 'open-uri'
 require 'lib/downloaded'
 
 class ItemHandler
-    def initialize(feed, item, log)
+    def initialize(feed, log)
         @feed = feed
-        @item = item
         @log = log
-
-        @url = URI.parse(@item.enclosure.url)
-        if @item.description[/Filename: (.*);/]
-            @file_name = "#{$1.gsub(/ /, '_').gsub(/,/, '')}.torrent"
-        else
-            @url.path.match(/\/([^\/]*)$/)
-            @file_name = $1.gsub(/ /, '_').gsub(/,/, '')
-        end
-
-        @file_size = @item.enclosure.length.to_i / 1024 / 1024
     end
 
     def name
+        @url = URI.parse(@item.enclosure.url)
+            if @item.description[/Filename: (.*);/]
+                @file_name = "#{$1.gsub(/ /, '_').gsub(/,/, '')}.torrent"
+            else
+                @url.path.match(/\/([^\/]*)$/)
+                @file_name = $1.gsub(/ /, '_').gsub(/,/, '')
+            end
         @file_name
     end
 
     def size
+        @file_size = @item.enclosure.length.to_i / 1024 / 1024
         @file_size
+    end
+
+    def parse_feed
+        @log.debug "Getting #{@feed['name']}"
+        rss_feed = @feed["url"]
+        rss_content = ""
+        open(rss_feed) do |f|
+            rss_content = f.read
+        end
+        @log.debug "Parsing #{@feed['name']}"
+        rss = RSS::Parser.parse(rss_content, false)
+        rss.channel.items.each do |item|
+            @item = item
+            name
+            size
+            yield @item
+        end
     end
 
     def regex_true?
